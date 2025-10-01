@@ -507,14 +507,6 @@
     
     <script>
         let repairCount = 0;
-
-        // เพิ่มรายการแรกเมื่อโหลดหน้า
-        document.addEventListener('DOMContentLoaded', function() {
-            addRepairItem();
-            // ตั้งค่าวันที่เป็นวันปัจจุบัน
-            document.querySelector('input[name="reportDate"]').valueAsDate = new Date();
-        });
-
         function addRepairItem() {
             repairCount++;
             const repairItemsContainer = document.getElementById('repairItems');
@@ -558,13 +550,22 @@
                     <input type="text" name="whenFound_${repairCount}" placeholder="เช่น เมื่อสัปดาห์ที่แล้ว, เมื่อเช้านี้, มา 2-3 วันแล้ว">
                 </div>
                 <div class="form-group">
-                    <label>แนบรูปภาพประกอบ</label>
-                    <div class="image-upload">
-                        <label for="images_${repairCount}" class="image-upload-label">+ เลือกรูปภาพ (สามารถเลือกหลายไฟล์ได้)</label>
-                        <input type="file" id="images_${repairCount}" name="images_${repairCount}" multiple accept="image/*" style="display: none;" onchange="previewImages(this, 'preview-container-${repairCount}')">
-                        <div id="preview-container-${repairCount}" class="image-preview-container"></div>
-                    </div>
-                </div>
+   <!-- ภายในฟังก์ชัน addRepairItem -->
+<div class="form-group">
+    <label>แนบรูปภาพประกอบ <span class="required">*</span></label>
+    <div class="image-upload">
+        <label for="images_${repairCount}" class="image-upload-label">
+            + เลือกรูปภาพ (สามารถเลือกหลายไฟล์ได้)
+        </label>
+        <!-- ✅ เปลี่ยน style เพื่อให้ required ทำงาน -->
+        <input type="file" id="images_${repairCount}" name="images_${repairCount}" 
+               multiple accept="image/*" required
+               style="position:absolute;opacity:0;width:0.1px;height:0.1px;"
+               onchange="previewImages(this, 'preview-container-${repairCount}')">
+        <div id="preview-container-${repairCount}" class="image-preview-container"></div>
+    </div>
+</div>
+
             `;
             
             repairItemsContainer.appendChild(repairItem);
@@ -743,6 +744,24 @@
                 submitBtn.disabled = false;
             }
         });
+          // เพิ่มรายการแรกเมื่อโหลดหน้า
+        document.addEventListener('DOMContentLoaded', function() {
+            addRepairItem();
+            // ตั้งค่าวันที่เป็นวันปัจจุบัน
+            document.querySelector('input[name="reportDate"]').valueAsDate = new Date();
+            
+            // เปลี่ยนข้อความแจ้งเตือนเป็นภาษาไทย
+            const requiredElements = document.querySelectorAll('[required]');
+            requiredElements.forEach(el => {
+                el.addEventListener('invalid', function () {
+                    this.setCustomValidity('กรุณากรอกข้อมูลให้ครบถ้วน');
+                });
+                el.addEventListener('input', function () {
+                    this.setCustomValidity('');
+                });
+            });
+        });
+        
     </script>
 </body>
 </html>
