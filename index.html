@@ -2,153 +2,344 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Event Monitoring Dashboard - Updated</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Crisis Dashboard - Real-time API</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --bg: #f0f2f5; --white: #ffffff; --accept: #2ecc71; --help: #e74c3c; --pending: #f1c40f; }
-        body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; }
-        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: var(--white); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .kpi-card { background: var(--white); padding: 15px; border-radius: 10px; text-align: center; border-bottom: 4px solid #ccc; }
-        .kpi-card.accept { border-color: var(--accept); }
-        .kpi-card.help { border-color: var(--help); }
-        .kpi-card.pending { border-color: var(--pending); }
-        .main-content { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-        table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: 10px; overflow: hidden; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #fafafa; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; color: #white; font-weight: bold; color: white; }
-        .bg-accept { background: var(--accept); }
-        .bg-help { background: var(--help); }
-        .bg-pending { background: var(--pending); }
+        :root { --primary: #0f172a; --accent: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --bg: #f8fafc; }
+        body { font-family: 'Sarabun', sans-serif; background: var(--bg); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Login Overlay */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); display: flex; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.6s ease; }
+        .login-card { background: white; padding: 40px; border-radius: 20px; width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-family: 'Sarabun'; }
+        .login-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+
+        /* Sidebar */
+        .sidebar { width: 260px; background: var(--primary); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 30px 20px; text-align: center; border-bottom: 1px solid #1e293b; }
+        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 12px; color: #94a3b8; }
+        .nav-item:hover { background: #1e293b; color: white; }
+        .nav-item.active { background: var(--accent); color: white; font-weight: bold; }
+        
+        /* Main Content */
+        .main-content { flex-grow: 1; overflow-y: auto; padding: 30px; }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- สไตล์ Dropdown และ Input แบบกำหนดเอง --- */
+        select, input[type="text"] {
+            padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 12px;
+            font-family: 'Sarabun'; font-size: 0.9rem; color: #334155; background-color: white;
+            transition: all 0.3s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 15px center; background-size: 16px; padding-right: 40px;
+        }
+        input[type="text"].search-input { appearance: none; background-image: none !important; }
+        select:focus, input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        /* UI Elements */
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .stat-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: left; }
+        .stat-card h3 { margin: 0; font-size: 0.9rem; color: #64748b; }
+        .stat-card .value { font-size: 2.2rem; font-weight: bold; margin: 10px 0; }
+        
+        .chart-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 25px; margin-bottom: 20px; }
+        .chart-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .chart-wrapper { position: relative; height: 280px; width: 100%; }
+
+        .filter-bar { background: white; padding: 20px; border-radius: 12px; display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+        .filter-bar select, .filter-bar input { flex: 1; min-width: 160px; }
+        
+        /* --- ล็อกความกว้างตารางให้คงที่ ไม่ขยับตาม Dropdown --- */
+        .table-container { background: white; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; } /* สำคัญ: ล็อก Layout */
+        th { background: #f1f5f9; padding: 15px; text-align: left; font-size: 0.85rem; color: #475569; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* กำหนดขนาดคอลัมน์หน้าตอบกลับล่าสุด */
+        .col-name { width: 30%; }
+        .col-branch { width: 15%; }
+        .col-dept { width: 15%; }
+        .col-status { width: 20%; }
+        .col-time { width: 20%; }
+
+        /* กำหนดขนาดคอลัมน์หน้าจัดการพนักงาน */
+        .col-emp-id { width: 10%; }
+        .col-emp-name { width: 35%; }
+        .col-emp-branch { width: 15%; }
+        .col-emp-dept { width: 25%; }
+        .col-emp-action { width: 15%; text-align: center; }
+
+        .badge { padding: 5px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: white; display: inline-block; min-width: 70px; text-align: center; }
+        .bg-success { background: var(--success); }
+        .bg-danger { background: var(--danger); }
+        .bg-warning { background: var(--warning); }
+        .help-msg { display: block; background: #fef2f2; border-left: 4px solid var(--danger); padding: 4px 8px; margin-top: 5px; color: var(--danger); font-size: 0.8rem; border-radius: 4px; white-space: normal; }
+
+        .action-btn { background: none; border: none; cursor: pointer; padding: 5px; transition: 0.2s; }
+        .btn-edit { color: var(--accent); }
+        .btn-delete { color: var(--danger); }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(4px); }
+        .modal-card { background: white; padding: 30px; border-radius: 20px; width: 100%; max-width: 450px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 25px; }
+        .btn-modal { flex: 1; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2 style="text-align:center;">ระบบติดตามสถานะ: <span id="eventTitle">เหตุการณ์ทั้งหมด</span></h2>
-    
-    <div class="filter-grid">
-        <div><label>สาขา</label><select id="fBranch"><option value="all">ทั้งหมด</option></select></div>
-        <div><label>แผนก</label><select id="fDept"><option value="all">ทั้งหมด</option></select></div>
-        <div><label>ช่วงเวลา (Time)</label><select id="fTime"><option value="all">ทั้งหมด</option></select></div>
-        <div><label>เหตุการณ์</label><select id="fEvent"><option value="all">ทั้งหมด</option></select></div>
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-card">
+            <h2 id="modalTitle" style="margin-top:0;">จัดการข้อมูลพนักงาน</h2>
+            <input type="hidden" id="empId">
+            <div style="margin-bottom:15px;"><label style="display:block;margin-bottom:5px;font-weight:bold;">ชื่อ-นามสกุล</label><input type="text" id="empName" style="width:100%;box-sizing:border-box;"></div>
+            <div style="margin-bottom:15px;"><label style="display:block;margin-bottom:5px;font-weight:bold;">สาขา</label><input type="text" id="empBranch" style="width:100%;box-sizing:border-box;"></div>
+            <div style="margin-bottom:15px;"><label style="display:block;margin-bottom:5px;font-weight:bold;">แผนก</label><input type="text" id="empDept" style="width:100%;box-sizing:border-box;"></div>
+            <div class="modal-buttons">
+                <button class="btn-modal" style="background:#e2e8f0;color:#475569;" onclick="closeModal()">ยกเลิก</button>
+                <button class="btn-modal" style="background:var(--accent);color:white;" onclick="handleSaveToWebhook()">บันทึกข้อมูล (n8n)</button>
+            </div>
+        </div>
     </div>
 
-    <div class="kpi-grid">
-        <div class="kpi-card"><h3>ทั้งหมด</h3><h2 id="total">0</h2></div>
-        <div class="kpi-card accept"><h3>รับทราบแล้ว</h3><h2 id="ok">0</h2></div>
-        <div class="kpi-card help"><h3>ขอความช่วยเหลือ</h3><h2 id="sos">0</h2></div>
-        <div class="kpi-card pending"><h3>ยังไม่ตอบ</h3><h2 id="wait">0</h2></div>
+    <div id="login-overlay">
+        <div class="login-card">
+            <i class="fas fa-user-shield fa-3x" style="color:var(--accent); margin-bottom:15px;"></i>
+            <h2>Safety Admin Login</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button id="loginBtn" onclick="handleLogin()">Login</button>
+            <p id="login-error" style="color:red; display:none; margin-top:15px;">รหัสผ่านไม่ถูกต้อง</p>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-header"><h2 style="margin:0;"><i class="fas fa-shield-alt"></i> <span>SafetyApp</span></h2></div>
+        <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')"><i class="fas fa-chart-line"></i> <span>Dashboard กราฟสรุป</span></div>
+        <div class="nav-item" id="nav-activity" onclick="showPage('activity')"><i class="fas fa-history"></i> <span>รายการตอบกลับ</span></div>
+        <div class="nav-item" id="nav-employees" onclick="showPage('employees')"><i class="fas fa-users-cog"></i> <span>จัดการพนักงาน</span></div>
+        <div class="nav-item" onclick="handleLogout()" style="margin-top:auto; color:var(--danger);"><i class="fas fa-sign-out-alt"></i> <span>ออกจากระบบ</span></div>
     </div>
 
     <div class="main-content">
-        <div style="background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <h3>รายละเอียด</h3>
-            <table id="dataTable">
-                <thead><tr><th>ชื่อ</th><th>แผนก/สาขา</th><th>สถานะ</th><th>ข้อความ</th></tr></thead>
-                <tbody id="tBody"></tbody>
-            </table>
+        <div id="dashboard" class="page active">
+            <div class="dashboard-header">
+                <h2 style="margin:0;">วิเคราะห์ข้อมูลความปลอดภัย</h2>
+                <select id="dashboardEventFilter" onchange="updateDashboardUI()" style="min-width: 240px;"><option value="all">แสดงภาพรวมทุกเหตุการณ์</option></select>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card" style="border-top: 5px solid var(--accent);"><h3>พนักงานในเหตุการณ์</h3><div id="total-val" class="value">0</div></div>
+                <div class="stat-card" style="border-top: 5px solid var(--success);"><h3>ปลอดภัย</h3><div id="accept-val" class="value" style="color:var(--success)">0</div></div>
+                <div class="stat-card" style="border-top: 5px solid var(--danger);"><h3>ขอความช่วยเหลือ</h3><div id="help-val" class="value" style="color:var(--danger)">0</div></div>
+                <div class="stat-card" style="border-top: 5px solid var(--warning);"><h3>รอการตอบกลับ</h3><div id="wait-val" class="value" style="color:var(--warning)">0</div></div>
+            </div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h4 style="margin-top:0; margin-bottom:15px; color:#475569;">สัดส่วนความปลอดภัย</h4>
+                    <div class="chart-wrapper"><canvas id="pieChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h4 style="margin-top:0; margin-bottom:15px; color:#475569;">สถิติเปรียบเทียบ (คน)</h4>
+                    <div class="chart-wrapper"><canvas id="barChart"></canvas></div>
+                </div>
+            </div>
         </div>
-        <div style="background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <h3>สถิติภาพรวม</h3>
-            <canvas id="chartArea"></canvas>
+
+        <div id="activity" class="page">
+            <h2 style="margin-bottom:20px;">รายการตอบกลับล่าสุด</h2>
+            <div class="filter-bar">
+                <select id="actEventFilter" onchange="renderActivity()"><option value="all">ทุกเหตุการณ์</option></select>
+                <select id="actStatusFilter" onchange="renderActivity()">
+                    <option value="all">ทุกสถานะ</option>
+                    <option value="Accept">ปลอดภัย (Accept)</option>
+                    <option value="Help">ช่วยเหลือ (Help)</option>
+                    <option value="Wait">รอตอบกลับ (Wait)</option>
+                </select>
+                <select id="actBranchFilter" onchange="renderActivity()"><option value="all">ทุกสาขา</option></select>
+                <select id="actDeptFilter" onchange="renderActivity()"><option value="all">ทุกแผนก</option></select>
+                <input type="text" class="search-input" id="searchAct" placeholder="ค้นหาชื่อพนักงาน..." onkeyup="renderActivity()">
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-name">ชื่อ / เหตุการณ์</th>
+                            <th class="col-branch">สาขา</th>
+                            <th class="col-dept">แผนก</th>
+                            <th class="col-status">สถานะ</th>
+                            <th class="col-time">เวลา</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="employees" class="page">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                <h2 style="margin:0;">จัดการฐานข้อมูลพนักงาน</h2>
+                <button onclick="openModal('add')" style="background:var(--success); color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; font-weight:bold;"><i class="fas fa-user-plus"></i> เพิ่มพนักงานใหม่</button>
+            </div>
+            <div class="filter-bar">
+                <select id="empBranchFilter" onchange="renderEmployees()"><option value="all">ทุกสาขา</option></select>
+                <select id="empDeptFilter" onchange="renderEmployees()"><option value="all">ทุกแผนก</option></select>
+                <input type="text" class="search-input" id="searchEmp" placeholder="ค้นหาชื่อ หรือ แผนก..." onkeyup="renderEmployees()">
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-emp-id">ลำดับ</th>
+                            <th class="col-emp-name">ชื่อ-นามสกุล</th>
+                            <th class="col-emp-branch">สาขา</th>
+                            <th class="col-emp-dept">แผนก</th>
+                            <th class="col-emp-action">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employeeTableBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-    const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1fgI4zH2nUvcZjaWLdxl4Kx2RRNBsUsNSFoOGE-cygxg8_oejx1RX0EDlNKZLheZaSUL9OAVotJbg/pub?output=csv';
-    let dataList = [];
-    let myChart = null;
+    <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzTyCTylq-kLyYFvTvw-dRXw9bxQL8ZWq83Zx_G88afmvLeKgtjH9X3W1qAPJ9maTT2/exec';
+    const N8N_WEBHOOK_URL = 'ใส่_URL_WEBHOOK_N8N_ที่นี่';
+    
+    let rawData = [];
+    let pieChart, barChart;
+    let currentAction = 'add';
 
-    async function loadData() {
-        const resp = await fetch(url);
-        const text = await resp.text();
-        const rows = text.split('\n').map(r => r.split(','));
-        
-        dataList = rows.slice(1).map(r => ({
-            name: r[1]?.trim(),
-            branch: r[2]?.trim(),
-            dept: r[3]?.trim(),
-            event: r[4]?.trim(),
-            reply: r[5]?.trim(),
-            msg: r[6]?.trim(),
-            time: r[7]?.trim()
-        })).filter(x => x.name);
-
-        initFilters();
-        render();
-    }
-
-    function initFilters() {
-        const setOptions = (id, key) => {
-            const select = document.getElementById(id);
-            const vals = [...new Set(dataList.map(d => d[key]))].filter(v => v);
-            vals.forEach(v => select.innerHTML += `<option value="${v}">${v}</option>`);
-            select.onchange = render;
-        };
-        setOptions('fBranch', 'branch');
-        setOptions('fDept', 'dept');
-        setOptions('fTime', 'time');
-        setOptions('fEvent', 'event');
-    }
-
-    function render() {
-        const b = document.getElementById('fBranch').value;
-        const d = document.getElementById('fDept').value;
-        const t = document.getElementById('fTime').value;
-        const e = document.getElementById('fEvent').value;
-
-        const filtered = dataList.filter(x => 
-            (b === 'all' || x.branch === b) &&
-            (d === 'all' || x.dept === d) &&
-            (t === 'all' || x.time === t) &&
-            (e === 'all' || x.event === e)
-        );
-
-        const stats = {
-            ok: filtered.filter(x => x.reply === 'Accept').length,
-            sos: filtered.filter(x => x.reply === 'Help').length,
-            wait: filtered.filter(x => !x.reply || x.reply === 'Pending').length
-        };
-
-        document.getElementById('total').innerText = filtered.length;
-        document.getElementById('ok').innerText = stats.ok;
-        document.getElementById('sos').innerText = stats.sos;
-        document.getElementById('wait').innerText = stats.wait;
-
-        const tbody = document.getElementById('tBody');
-        tbody.innerHTML = '';
-        filtered.forEach(x => {
-            const statusClass = x.reply === 'Accept' ? 'bg-accept' : (x.reply === 'Help' ? 'bg-help' : 'bg-pending');
-            const statusText = x.reply === 'Accept' ? 'รับทราบ' : (x.reply === 'Help' ? 'ช่วยเหลือ' : 'รอการตอบ');
-            tbody.innerHTML += `<tr>
-                <td>${x.name}</td>
-                <td>${x.dept}<br><small>${x.branch}</small></td>
-                <td><span class="badge ${statusClass}">${statusText}</span></td>
-                <td style="color:red">${x.reply === 'Help' ? x.msg : '-'}</td>
-            </tr>`;
+    window.addEventListener('load', () => {
+        const auth = localStorage.getItem('isLoggedIn');
+        if (auth === 'true') {
+            document.getElementById('login-overlay').style.display = 'none';
+            fetchData();
+        }
+        ['username', 'password'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
         });
+    });
 
-        drawChart(stats);
+    async function handleLogin() {
+        const user = document.getElementById('username').value, pass = document.getElementById('password').value;
+        if(!user || !pass) return;
+        Swal.fire({ title: 'กำลังตรวจสอบ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        try {
+            const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', username: user, password: pass }) });
+            const result = await response.json();
+            if (result.success) {
+                Swal.fire({ icon: 'success', title: 'สำเร็จ', timer: 1500, showConfirmButton: false }).then(() => {
+                    localStorage.setItem('isLoggedIn', 'true');
+                    document.getElementById('login-overlay').style.display = 'none';
+                    fetchData();
+                });
+            } else { Swal.fire({ icon: 'error', title: 'รหัสไม่ถูกต้อง' }); }
+        } catch (e) { Swal.fire({ icon: 'warning', title: 'Error' }); }
     }
 
-    function drawChart(s) {
-        const ctx = document.getElementById('chartArea').getContext('2d');
-        if (myChart) myChart.destroy();
-        myChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['รับทราบ', 'ช่วยเหลือ', 'ยังไม่ตอบ'],
-                datasets: [{ data: [s.ok, s.sos, s.wait], backgroundColor: ['#2ecc71', '#e74c3c', '#f1c40f'] }]
-            }
+    async function fetchData() {
+        try {
+            const response = await fetch(API_URL);
+            let data = await response.json();
+            rawData = data.filter(d => d['รายชื่อพนักงาน']).map(d => {
+                if (!d.Reply || d.Reply.trim() === "") d.Reply = "Wait";
+                return d;
+            });
+            populateAllFilters();
+            updateDashboardUI();
+            renderActivity();
+            renderEmployees();
+        } catch (error) { console.error("API Error:", error); }
+    }
+
+    async function handleSaveToWebhook() {
+        const payload = { action: currentAction, data: { id: document.getElementById('empId').value || Date.now().toString(), name: document.getElementById('empName').value, branch: document.getElementById('empBranch').value, dept: document.getElementById('empDept').value } };
+        try {
+            await fetch(N8N_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            Swal.fire('สำเร็จ', 'ดำเนินการเรียบร้อย', 'success');
+            closeModal();
+            fetchData();
+        } catch (e) { Swal.fire('Error', 'ส่งข้อมูลล้มเหลว', 'error'); }
+    }
+
+    async function handleDelete(id) {
+        const result = await Swal.fire({ title: 'ยืนยันการลบ?', icon: 'warning', showCancelButton: true });
+        if (result.isConfirmed) {
+            try {
+                await fetch(N8N_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', data: { id: id } }) });
+                fetchData();
+            } catch (e) { console.error(e); }
+        }
+    }
+
+    function populateAllFilters() {
+        const events = [...new Set(rawData.map(d => d['Event']))].filter(Boolean).sort();
+        const branches = [...new Set(rawData.map(d => d['สาขา']))].filter(Boolean).sort();
+        const depts = [...new Set(rawData.map(d => d['แผนก']))].filter(Boolean).sort();
+        const eventOpts = '<option value="all">ทุกเหตุการณ์</option>' + events.map(e => `<option value="${e}">${e}</option>`).join('');
+        const branchOpts = '<option value="all">ทุกสาขา</option>' + branches.map(b => `<option value="${b}">${b}</option>`).join('');
+        const deptOpts = '<option value="all">ทุกแผนก</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+        document.getElementById('dashboardEventFilter').innerHTML = eventOpts;
+        document.getElementById('actEventFilter').innerHTML = eventOpts;
+        document.getElementById('actBranchFilter').innerHTML = branchOpts;
+        document.getElementById('actDeptFilter').innerHTML = deptOpts;
+        document.getElementById('empBranchFilter').innerHTML = branchOpts;
+        document.getElementById('empDeptFilter').innerHTML = deptOpts;
+    }
+
+    function updateDashboardUI() {
+        const ev = document.getElementById('dashboardEventFilter').value;
+        const f = ev === 'all' ? rawData : rawData.filter(d => d['Event'] === ev);
+        const a = f.filter(d => d.Reply === 'Accept').length, h = f.filter(d => d.Reply === 'Help').length, w = f.filter(d => d.Reply === 'Wait').length;
+        document.getElementById('total-val').innerText = f.length; document.getElementById('accept-val').innerText = a; document.getElementById('help-val').innerText = h; document.getElementById('wait-val').innerText = w;
+        if(pieChart) pieChart.destroy();
+        pieChart = new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: { labels: ['ปลอดภัย', 'ช่วยเหลือ', 'รอตอบกลับ'], datasets: [{ data: [a, h, w], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], borderWeight: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } } });
+        const evList = ev === 'all' ? [...new Set(rawData.map(d => d['Event']))].filter(Boolean) : [ev];
+        if(barChart) barChart.destroy();
+        barChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: evList, datasets: [{ label: 'ปลอดภัย', data: evList.map(e => rawData.filter(d => d.Event === e && d.Reply === 'Accept').length), backgroundColor: '#10b981' }, { label: 'ช่วยเหลือ', data: evList.map(e => rawData.filter(d => d.Event === e && d.Reply === 'Help').length), backgroundColor: '#ef4444' }, { label: 'รอตอบกลับ', data: evList.map(e => rawData.filter(d => d.Event === e && d.Reply === 'Wait').length), backgroundColor: '#f59e0b' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } });
+    }
+
+    function renderActivity() {
+        const ev = document.getElementById('actEventFilter').value, st = document.getElementById('actStatusFilter').value, br = document.getElementById('actBranchFilter').value, de = document.getElementById('actDeptFilter').value, s = document.getElementById('searchAct').value.toLowerCase();
+        const f = rawData.filter(d => (ev === 'all' || d.Event === ev) && (st === 'all' || d.Reply === st) && (br === 'all' || d['สาขา'] === br) && (de === 'all' || d['แผนก'] === de) && d['รายชื่อพนักงาน'].toLowerCase().includes(s));
+        document.getElementById('activityTableBody').innerHTML = f.map(i => `<tr><td><b>${i['รายชื่อพนักงาน']}</b><br><small>${i.Event}</small></td><td>${i['สาขา']}</td><td>${i['แผนก']}</td><td><span class="badge ${i.Reply === 'Accept' ? 'bg-success' : (i.Reply === 'Help' ? 'bg-danger' : 'bg-warning')}">${i.Reply}</span><br>${i.Reply === 'Help' ? `<span class="help-msg">⚠️ ${i.Message}</span>` : ''}</td><td>${i.Time || '-'}</td></tr>`).join('');
+    }
+
+    function renderEmployees() {
+        const br = document.getElementById('empBranchFilter').value, de = document.getElementById('empDeptFilter').value, s = document.getElementById('searchEmp').value.toLowerCase();
+        const unique = []; const map = new Map();
+        rawData.forEach(item => { if(!map.has(item['รายชื่อพนักงาน'])) { map.set(item['รายชื่อพนักงาน'], true); unique.push(item); } });
+        const f = unique.filter(d => (br === 'all' || d['สาขา'] === br) && (de === 'all' || d['แผนก'] === de) && (d['รายชื่อพนักงาน'].toLowerCase().includes(s) || (d['แผนก'] && d['แผนก'].toLowerCase().includes(s))));
+        document.getElementById('employeeTableBody').innerHTML = f.map(i => `<tr><td>#${i['ลำดับ']}</td><td><b>${i['รายชื่อพนักงาน']}</b></td><td>${i['สาขา']}</td><td>${i['แผนก']}</td><td style="text-align:center;"><button class="action-btn btn-edit" onclick="openModal('edit', '${i['ลำดับ']}', '${i['รายชื่อพนักงาน']}', '${i['สาขา']}', '${i['แผนก']}')"><i class="fas fa-edit"></i></button><button class="action-btn btn-delete" onclick="handleDelete('${i['ลำดับ']}')"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+    }
+
+    function openModal(action, id='', name='', branch='', dept='') {
+        currentAction = action;
+        document.getElementById('modalTitle').innerText = action === 'add' ? 'เพิ่มพนักงานใหม่' : 'แก้ไขข้อมูลพนักงาน';
+        document.getElementById('empId').value = id; document.getElementById('empName').value = name; document.getElementById('empBranch').value = branch; document.getElementById('empDept').value = dept;
+        document.getElementById('modalOverlay').style.display = 'flex';
+    }
+    function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; }
+    function showPage(pId) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); document.getElementById(pId).classList.add('active'); document.getElementById('nav-' + pId).classList.add('active'); }
+    function handleLogout() {
+        Swal.fire({ title: 'ยืนยันการออกจากระบบ?', text: "คุณต้องการออกจากระบบใช่หรือไม่", icon: 'question', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#475569', confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' }).then((result) => {
+            if (result.isConfirmed) { localStorage.removeItem('isLoggedIn'); location.reload(); }
         });
     }
 
-    loadData();
-</script>
+    setInterval(() => { if(localStorage.getItem('isLoggedIn') === 'true') fetchData(); }, 15000);
+    </script>
 </body>
 </html>
